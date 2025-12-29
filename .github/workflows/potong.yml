@@ -1,17 +1,17 @@
-name: Potong Video & Pasang Logo
+name: Potong Video & Pasang Logo (Fixed Cookies)
 
 on:
   workflow_dispatch:
     inputs:
       link_youtube:
-        description: 'Link YouTube (Video 5 Jam)'
+        description: 'Link YouTube (Video Sumber)'
         required: true
       mulai:
         description: 'Mulai (Jam:Menit:Detik)'
-        default: '02:35:53'
+        default: '00:00:10'
       selesai:
         description: 'Selesai (Jam:Menit:Detik)'
-        default: '02:53:35'
+        default: '00:00:40'
 
 jobs:
   proses_editing:
@@ -23,24 +23,29 @@ jobs:
           sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
           sudo chmod a+rx /usr/local/bin/yt-dlp
 
-      - name: Eksekusi Editing Otomatis
+      - name: Eksekusi Potong & Tempel Logo
         run: |
-          # Ambil URL asli dari link YouTube yang kamu input
-          VIDEO_URL=$(yt-dlp -f "bestvideo[height<=720]+bestaudio/best[height<=720]" -g "${{ github.event.inputs.link_youtube }}")
+          # BARIS PENTING: Nulis secret ke file cookies.txt
+          echo "${{ secrets.YT_COOKIES }}" > cookies.txt
           
-          # Ambil logo kamu
-          yt-dlp -f "best" --merge-output-format mp4 "https://youtu.be/zR6n39ZWrJM" -o logo.mp4
+          echo "Mencari sumber video..."
+          # Pakai --cookies cookies.txt supaya tembus blokir
+          VIDEO_URL=$(yt-dlp --cookies cookies.txt -f "bestvideo[height<=720]+bestaudio/best[height<=720]" -g "${{ github.event.inputs.link_youtube }}")
+          
+          echo "Mengunduh logo..."
+          yt-dlp --cookies cookies.txt -f "best" --merge-output-format mp4 "https://youtu.be/zR6n39ZWrJM" -o logo.mp4
 
-          # Proses potong dan tempel logo
+          echo "Memulai pemrosesan video..."
           ffmpeg -ss ${{ github.event.inputs.mulai }} -to ${{ github.event.inputs.selesai }} -i "$VIDEO_URL" \
           -stream_loop -1 -i logo.mp4 \
           -filter_complex "[1:v]colorkey=0x008100:0.1:0.1,scale=75:-1[logo]; [0:v][logo]overlay=W-w-15:15:shortest=1" \
           -c:v libx264 -preset fast -crf 22 -c:a aac -b:a 128k \
-          hasil_edit.mp4
+          hasil_potongan.mp4
 
-      - name: Upload Hasil Jadi
+      - name: Upload Hasil Jadi (ZIP)
         uses: actions/upload-artifact@v4
         with:
           name: Video_Hasil_Potongan
-          path: hasil_edit.mp4
+          path: hasil_potongan.mp4
+          retention-days: 1
           
